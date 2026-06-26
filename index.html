@@ -39,18 +39,25 @@
   .hidden{display:none!important;}
   .center{text-align:center;}
 
-  /* 工程師按鈕陣列 */
+  /* 人員按鈕陣列 */
   .eng-grid{display:flex;flex-wrap:wrap;gap:10px;}
   .eng-btn{flex:1 1 28%;padding:14px 6px;border:2px solid var(--line);border-radius:12px;background:#fff;
            font-size:16px;font-weight:700;cursor:pointer;transition:.15s;}
   .eng-btn.active{border-color:var(--primary);background:var(--primary);color:#fff;
                   box-shadow:0 4px 12px rgba(13,110,253,.3);}
 
+  /* 類別按鈕陣列 */
+  .cat-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .cat-btn{flex:1 1 30%;padding:10px 4px;border:2px solid var(--line);border-radius:10px;background:#fff;
+           font-size:14px;font-weight:700;cursor:pointer;transition:.15s;}
+  .cat-btn.active{border-color:var(--primary);background:var(--primary);color:#fff;
+                  box-shadow:0 4px 10px rgba(13,110,253,.2);}
+
   /* 照片預覽 */
   .preview{margin-top:10px;border:1px dashed var(--line);border-radius:10px;overflow:hidden;display:none;}
   .preview img{width:100%;display:block;}
 
-  /* 工程師清單卡片 */
+  /* 人員清單卡片 */
   .job{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;background:#fff;}
   .job .amt{font-size:26px;font-weight:800;color:var(--primary);}
   .job .meta{font-size:13px;color:var(--muted);}
@@ -106,7 +113,7 @@ const $ = (s,el=document)=>el.querySelector(s);
 const params = new URLSearchParams(location.search);
 const app = $('#app');
 let ADMIN_TOKEN = '';          // Google ID Token
-let ENGINEERS = ['師傅A','師傅B','師傅C'];
+let ENGINEERS = ['盧佳鈴', '余冠廷', '廖崇旭', '蔡道齊', '賴銘志', '蔡育倫'];
 
 function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.add('show');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),ms);}
@@ -159,17 +166,17 @@ function renderLanding(){
   <div class="wrap">
     <div class="card">
       <h2>請選擇進入方式</h2>
-      <p class="muted">管理員需 Google 登入；工程師簽收免登入，請使用主管提供的專屬連結。</p>
+      <p class="muted">管理員需 Google 登入；簽收免登入，請使用主管提供的專屬連結。</p>
       <a href="?role=admin"><button class="btn btn-primary btn-lg" style="margin-top:8px;">🔐 管理員登入（建檔 / 總表）</button></a>
       <div id="engLinks" style="margin-top:18px;"></div>
     </div>
   </div>`;
-  // 載入工程師名單，產生快速連結
+  // 載入人員名單，產生快速連結
   api({action:'getConfig'}).then(d=>{
     ENGINEERS=d.engineers||ENGINEERS;
     const box=$('#engLinks');
-    box.innerHTML='<label>工程師簽收入口</label>'+ENGINEERS.map(e=>
-      `<a href="?user=${encodeURIComponent(e)}"><button class="btn btn-ghost" style="margin-bottom:8px;">👷 ${e} 的簽收清單</button></a>`
+    box.innerHTML='<label>人員簽收入口</label>'+ENGINEERS.map(e=>
+      `<a href="?user=${encodeURIComponent(e)}"><button class="btn btn-ghost" style="margin-bottom:8px;">👤 ${e} 的簽收清單</button></a>`
     ).join('');
   }).catch(()=>{});
 }
@@ -193,7 +200,8 @@ function renderAdmin(){
       <!-- 建檔表單 -->
       <div class="card">
         <h2>📝 新增請款建檔</h2>
-        <label>① 上傳發票照片</label>
+        
+        <label>① 上傳發票照片（可點選上傳，或直接在此頁面貼上 Ctrl+V 圖片）</label>
         <input type="file" accept="image/*" id="invFile" />
         <div class="preview" id="invPreview"><img id="invImg" /></div>
         <button class="btn btn-ghost" id="ocrBtn" style="margin-top:10px;" disabled>🔍 自動辨識金額與日期</button>
@@ -203,15 +211,22 @@ function renderAdmin(){
           <div><label>發票日期</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" /></div>
         </div>
 
-        <label>③ 選擇工程師（師傅）</label>
+        <label>③ 選擇人員</label>
         <div class="eng-grid" id="engGrid"></div>
 
-        <div class="row" style="margin-top:6px;">
-          <div><label>④ 專案名稱</label><input type="text" id="fProject" placeholder="例：信義路門市裝修" /></div>
-          <div><label>類別</label><input type="text" id="fCategory" placeholder="例：材料費" /></div>
+        <div style="margin-top:12px;">
+          <label>④ 專案名稱（選填，可直接輸入或點選下方歷史專案）</label>
+          <input type="text" id="fProject" list="projectList" placeholder="例：鵬園703館修繕工程" />
+          <datalist id="projectList"></datalist>
+          <div id="projectSuggestions" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;"></div>
         </div>
 
-        <button class="btn btn-primary btn-lg" id="submitBtn" style="margin-top:16px;">✅ 送出建檔（狀態：待簽收）</button>
+        <div style="margin-top:12px;">
+          <label>⑤ 選擇類別</label>
+          <div class="cat-grid" id="catGrid"></div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="submitBtn" style="margin-top:20px;">✅ 送出建檔（狀態：待簽收）</button>
       </div>
 
       <!-- 總表 -->
@@ -231,6 +246,7 @@ function renderAdmin(){
   });
 
   bindAdminForm();
+  bindPasteEvent();
 }
 
 function onGoogleLogin(resp){
@@ -239,12 +255,13 @@ function onGoogleLogin(resp){
   $('#adminWho').textContent='已登入：'+payload.email;
   $('#loginCard').classList.add('hidden');
   $('#adminPanel').classList.remove('hidden');
-  // 載入工程師名單與總表
+  // 載入人員名單與總表
   api({action:'getConfig'}).then(d=>{ENGINEERS=d.engineers||ENGINEERS;renderEngGrid();}).catch(()=>renderEngGrid());
   loadAllTable();
 }
 
 let selectedEngineer='';
+let selectedCategory='';
 let invoiceDataUrl='';
 
 function renderEngGrid(){
@@ -256,44 +273,100 @@ function renderEngGrid(){
   });
 }
 
+function renderCatGrid(){
+  const cats = ['工程材料', '作業工具', '停車費', '油費', '食物飲料', '其他'];
+  $('#catGrid').innerHTML=cats.map(c=>`<button type="button" class="cat-btn" data-cat="${c}">${c}</button>`).join('');
+  $('#catGrid').querySelectorAll('.cat-btn').forEach(b=>{
+    b.onclick=()=>{selectedCategory=b.dataset.cat;
+      $('#catGrid').querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');};
+  });
+}
+
+async function handleImageFile(file) {
+  if (!file) return;
+  toast('壓縮圖片中…');
+  try {
+    invoiceDataUrl = await fileToCompressedDataURL(file);
+    $('#invImg').src = invoiceDataUrl;
+    $('#invPreview').style.display = 'block';
+    $('#ocrBtn').disabled = false;
+    
+    // 自動觸發辨識
+    await triggerOcr();
+  } catch (err) {
+    toast('載入圖片失敗：' + err.message, 3500);
+  }
+}
+
+async function triggerOcr() {
+  if (!invoiceDataUrl) return;
+  const btn = $('#ocrBtn');
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 正在自動辨識發票資訊…';
+  try {
+    const d = await api({ action: 'ocr', idToken: ADMIN_TOKEN, imageBase64: invoiceDataUrl });
+    if (d.amount) $('#fAmount').value = d.amount;
+    if (d.date) $('#fDate').value = d.date;
+    toast('自動辨識完成，請確認金額與日期');
+    btn.innerHTML = '✨ 辨識完成（點擊可重新辨識）';
+  } catch (err) {
+    toast('自動辨識失敗：' + err.message, 3500);
+    btn.innerHTML = '❌ 辨識失敗（點擊可重試）';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function bindPasteEvent() {
+  window.addEventListener('paste', async (e) => {
+    // 只有在管理員已登入且面板顯示時才處理貼上
+    if (!ADMIN_TOKEN || $('#adminPanel').classList.contains('hidden')) return;
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') === 0) {
+        const file = items[i].getAsFile();
+        await handleImageFile(file);
+        break;
+      }
+    }
+  });
+}
+
+window.selectProject = function(name) {
+  $('#fProject').value = name;
+};
+
 function bindAdminForm(){
-  $('#invFile').addEventListener('change',async e=>{
-    const f=e.target.files[0]; if(!f)return;
-    toast('壓縮圖片中…');
-    invoiceDataUrl=await fileToCompressedDataURL(f);
-    $('#invImg').src=invoiceDataUrl;
-    $('#invPreview').style.display='block';
-    $('#ocrBtn').disabled=false;
+  renderCatGrid();
+
+  $('#invFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (f) await handleImageFile(f);
   });
 
-  $('#ocrBtn').addEventListener('click',async()=>{
-    if(!invoiceDataUrl)return;
-    const btn=$('#ocrBtn');const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 辨識中…';
-    try{
-      const d=await api({action:'ocr',idToken:ADMIN_TOKEN,imageBase64:invoiceDataUrl});
-      if(d.amount)$('#fAmount').value=d.amount;
-      if(d.date)$('#fDate').value=d.date;
-      toast('辨識完成，請確認金額與日期是否正確');
-    }catch(err){toast('辨識失敗：'+err.message,3500);}
-    finally{btn.disabled=false;btn.innerHTML=old;}
+  $('#ocrBtn').addEventListener('click', async () => {
+    await triggerOcr();
   });
 
   $('#submitBtn').addEventListener('click',async()=>{
     const project=$('#fProject').value.trim();
     const amount=$('#fAmount').value.trim();
-    if(!selectedEngineer)return toast('請選擇工程師');
+    if(!selectedEngineer)return toast('請選擇人員');
     if(!amount||Number(amount)<=0)return toast('請輸入正確金額');
-    if(!project)return toast('請輸入專案名稱');
     const btn=$('#submitBtn');const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 送出中…';
     try{
       await api({action:'createRecord',idToken:ADMIN_TOKEN,
-        imageBase64:invoiceDataUrl,project,category:$('#fCategory').value.trim(),
+        imageBase64:invoiceDataUrl,project,category:selectedCategory,
         engineer:selectedEngineer,amount,date:$('#fDate').value.trim()});
       toast('建檔成功！已通知 '+selectedEngineer+' 簽收');
       // 重置表單
       $('#invFile').value='';invoiceDataUrl='';$('#invPreview').style.display='none';$('#ocrBtn').disabled=true;
-      $('#fAmount').value='';$('#fDate').value='';$('#fProject').value='';$('#fCategory').value='';
+      $('#ocrBtn').innerHTML='🔍 自動辨識金額與日期';
+      $('#fAmount').value='';$('#fDate').value='';$('#fProject').value='';
       selectedEngineer='';$('#engGrid').querySelectorAll('.eng-btn').forEach(x=>x.classList.remove('active'));
+      selectedCategory='';$('#catGrid').querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active'));
       loadAllTable();
     }catch(err){toast('建檔失敗：'+err.message,3500);}
     finally{btn.disabled=false;btn.innerHTML=old;}
@@ -311,7 +384,19 @@ async function loadAllTable(){
     let wait=0,done=0,diffCnt=0,total=0;
     rs.forEach(r=>{r.status==='待簽收'?wait++:done++; if(r.diff&&r.diff!=='正常'&&r.diff!=='')diffCnt++; total+=Number(r.amount||0);});
     $('#summary').innerHTML=`共 ${rs.length} 筆｜待簽收 <b>${wait}</b>｜已結清 <b>${done}</b>｜金額差異 <b style="color:var(--danger)">${diffCnt}</b>｜核發總額 NT$${total.toLocaleString()}`;
-    tb.innerHTML=`<tr><th>狀態</th><th>專案</th><th>工程師</th><th>核發</th><th>實收</th><th>差異</th><th>日期</th><th>發票</th><th>簽名</th></tr>`+
+    
+    // 提取不重複的歷史專案名稱
+    const projects = [...new Set(rs.map(r => r.project).filter(p => p && p.trim() !== ''))];
+    const dl = $('#projectList');
+    if (dl) dl.innerHTML = projects.map(p => `<option value="${esc(p)}"></option>`).join('');
+    const sug = $('#projectSuggestions');
+    if (sug) {
+      sug.innerHTML = projects.slice(0, 8).map(p => 
+        `<span class="pill pill-wait" style="cursor:pointer; font-size:11px; margin-right:4px;" onclick="selectProject('${esc(p)}')">${esc(p)}</span>`
+      ).join('');
+    }
+
+    tb.innerHTML=`<tr><th>狀態</th><th>專案</th><th>人員</th><th>核發</th><th>實收</th><th>差異</th><th>日期</th><th>發票</th><th>簽名</th></tr>`+
       rs.map(r=>{
         const isDiff=r.diff&&r.diff!=='正常'&&r.diff!=='';
         const pill=r.status==='待簽收'?'<span class="pill pill-wait">待簽收</span>':'<span class="pill pill-done">已結清</span>';
@@ -321,8 +406,8 @@ async function loadAllTable(){
           <td>${r.actualAmount!==''&&r.actualAmount!=null?'NT$'+Number(r.actualAmount).toLocaleString():'—'}</td>
           <td>${isDiff?'<b style="color:var(--danger)">'+esc(r.diff)+'</b>':(r.status==='已結清'?'正常':'—')}</td>
           <td>${esc(r.date||'')}</td>
-          <td>${r.photoUrl?`<a class="link" href="${r.photoUrl}" target="_blank">查看</a>`:'—'}</td>
-          <td>${r.signUrl?`<a class="link" href="${r.signUrl}" target="_blank">查看</a>`:'—'}</td>
+          <td>${r.photoUrl?`<a class="link" href="${r.photoUrl}" target="_blank">查看</a>` : '—'}</td>
+          <td>${r.signUrl?`<a class="link" href="${r.signUrl}" target="_blank">查看</a>` : '—'}</td>
         </tr>`;
       }).join('');
   }catch(err){
@@ -333,12 +418,12 @@ async function loadAllTable(){
 
 
 /* ============================================================
- * 三、工程師端（免登入）
+ * 三、人員端（免登入）
  * ============================================================ */
 function renderEngineer(name){
   document.title=name+' — 待簽收清單';
   app.innerHTML=`
-  <header><h1>👷 ${esc(name)} 的簽收清單</h1><div class="sub">點選項目進行電子簽收，無需登入</div></header>
+  <header><h1>👤 ${esc(name)} 的簽收清單</h1><div class="sub">點選項目進行電子簽收，無需登入</div></header>
   <div class="wrap"><div id="jobs"><div class="card center muted">載入中…</div></div></div>
   <div id="modalHost"></div>`;
   loadJobs(name);
