@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>汎高科技 — 零用金請款與簽收系統</title>
+<style>
+  /* ===== 全域樣式 ===== */
+  :root{
+    --primary:#0d6efd; --primary-dark:#0b5ed7; --ok:#198754; --danger:#dc3545;
+    --warn:#ffc107; --bg:#f5f7fb; --card:#ffffff; --line:#e3e8f0; --text:#1f2937; --muted:#6b7280;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.6;}
+  header{background:linear-gradient(135deg,var(--primary),#3b82f6);color:#fff;padding:16px 18px;
+         box-shadow:0 2px 10px rgba(13,110,253,.25);position:sticky;top:0;z-index:50;}
+  header h1{margin:0;font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  header .sub{font-size:12px;opacity:.9;margin-top:2px;}
+  .wrap{max-width:760px;margin:0 auto;padding:16px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;
+        box-shadow:0 1px 4px rgba(0,0,0,.04);}
+  .card h2{margin:0 0 14px;font-size:16px;display:flex;align-items:center;gap:8px;}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px;font-weight:600;}
+  input[type=text],input[type=number],select,textarea{
+    width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:#fff;}
+  input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(13,110,253,.12);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:10px;
+       padding:13px 18px;font-size:16px;font-weight:700;cursor:pointer;transition:.15s;width:100%;}
+  .btn-primary{background:var(--primary);color:#fff;} .btn-primary:active{background:var(--primary-dark);}
+  .btn-ok{background:var(--ok);color:#fff;} .btn-danger{background:var(--danger);color:#fff;}
+  .btn-ghost{background:#eef2ff;color:var(--primary);}
+  .btn-lg{padding:18px;font-size:19px;border-radius:14px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .row{display:flex;gap:10px;} .row>*{flex:1;}
+  .muted{color:var(--muted);font-size:13px;}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+  .pill-wait{background:#fff3cd;color:#8a6d00;} .pill-done{background:#d1e7dd;color:#0f5132;}
+  .hidden{display:none!important;}
+  .center{text-align:center;}
+
+  /* 工程師按鈕陣列 */
+  .eng-grid{display:flex;flex-wrap:wrap;gap:10px;}
+  .eng-btn{flex:1 1 28%;padding:14px 6px;border:2px solid var(--line);border-radius:12px;background:#fff;
+           font-size:16px;font-weight:700;cursor:pointer;transition:.15s;}
+  .eng-btn.active{border-color:var(--primary);background:var(--primary);color:#fff;
+                  box-shadow:0 4px 12px rgba(13,110,253,.3);}
+
+  /* 照片預覽 */
+  .preview{margin-top:10px;border:1px dashed var(--line);border-radius:10px;overflow:hidden;display:none;}
+  .preview img{width:100%;display:block;}
+
+  /* 工程師清單卡片 */
+  .job{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;background:#fff;}
+  .job .amt{font-size:26px;font-weight:800;color:var(--primary);}
+  .job .meta{font-size:13px;color:var(--muted);}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;
+           justify-content:center;z-index:100;padding:0;}
+  .modal{background:#fff;width:100%;max-width:760px;border-radius:18px 18px 0 0;padding:22px;
+         max-height:94vh;overflow:auto;animation:slideUp .25s ease;}
+  @keyframes slideUp{from{transform:translateY(40px);opacity:.4;}to{transform:none;opacity:1;}}
+  .big-amount{font-size:15px;color:var(--muted);text-align:center;}
+  .big-amount b{display:block;font-size:40px;color:var(--text);margin-top:6px;letter-spacing:1px;}
+
+  /* 簽名板 */
+  .sig-wrap{border:2px dashed var(--primary);border-radius:12px;background:#fff;margin-top:10px;touch-action:none;}
+  canvas{display:block;width:100%;height:220px;border-radius:10px;}
+
+  /* 提示 */
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2937;color:#fff;
+         padding:12px 20px;border-radius:10px;font-size:14px;z-index:200;opacity:0;transition:.25s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+           display:inline-block;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* 總表 */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
+  th{background:#f1f5f9;font-size:12px;color:var(--muted);position:sticky;top:0;}
+  .tbl-scroll{overflow-x:auto;}
+  tr.diff{background:#fff3cd;}
+  a.link{color:var(--primary);text-decoration:none;font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- ===================== 設定區 ===================== -->
+<script>
+  /* ★ dc, 部署完 GAS 後，請將下方 PUT_YOUR_GAS_WEB_APP_URL_HERE 換成你的 /exec 結尾網址 ★ */
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyjzntwqTmIStmgX78Jx0tj0WnpTIvAWBpt-gaTfLAUVihit1pgt9xmaZskmfN5AhuM/exec'; 
+  
+  // OAuth 用戶端 ID 已經幫你填好囉
+  const GOOGLE_CLIENT_ID = '854377183831-faphg9bs1j2r50cmepl6h4pi11ogl15v.apps.googleusercontent.com';
+</script>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ===================== 主程式 ===================== -->
+<script>
+/* ---------- 共用工具 ---------- */
+const $ = (s,el=document)=>el.querySelector(s);
+const params = new URLSearchParams(location.search);
+const app = $('#app');
+let ADMIN_TOKEN = '';          // Google ID Token
+let ENGINEERS = ['師傅A','師傅B','師傅C'];
+
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),ms);}
+
+/** 呼叫 GAS（以 text/plain 送出避免 CORS 預檢） */
+async function api(payload){
+  if(!GAS_URL || GAS_URL.indexOf('PUT_YOUR')===0){throw new Error('尚未設定 GAS_URL，請先部署後端並填入網址。');}
+  const res = await fetch(GAS_URL,{
+    method:'POST', redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(payload)
+  });
+  const txt = await res.text();
+  let data; try{data=JSON.parse(txt);}catch(e){throw new Error('後端回應格式錯誤：'+txt.slice(0,120));}
+  if(!data.ok) throw new Error(data.error||'未知錯誤');
+  return data;
+}
+
+/** 壓縮圖片 → DataURL（控制上傳大小） */
+function fileToCompressedDataURL(file,maxSide=1600,quality=0.82){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      let{width:w,height:h}=img;
+      if(Math.max(w,h)>maxSide){const r=maxSide/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=reject;
+    const fr=new FileReader();fr.onload=e=>img.src=e.target.result;fr.onerror=reject;fr.readAsDataURL(file);
+  });
+}
+
+/* ---------- 路由 ---------- */
+const role = params.get('role');
+const user = params.get('user');
+if(role==='admin')      renderAdmin();
+else if(user)           renderEngineer(decodeURIComponent(user));
+else                    renderLanding();
+
+
+/* ============================================================
+ * 一、首頁（未帶參數）
+ * ============================================================ */
+function renderLanding(){
+  document.title='汎高零用金系統';
+  app.innerHTML=`
+  <header><h1>💰 汎高科技 零用金系統</h1><div class="sub">請款建檔與電子簽收平台</div></header>
+  <div class="wrap">
+    <div class="card">
+      <h2>請選擇進入方式</h2>
+      <p class="muted">管理員需 Google 登入；工程師簽收免登入，請使用主管提供的專屬連結。</p>
+      <a href="?role=admin"><button class="btn btn-primary btn-lg" style="margin-top:8px;">🔐 管理員登入（建檔 / 總表）</button></a>
+      <div id="engLinks" style="margin-top:18px;"></div>
+    </div>
+  </div>`;
+  // 載入工程師名單，產生快速連結
+  api({action:'getConfig'}).then(d=>{
+    ENGINEERS=d.engineers||ENGINEERS;
+    const box=$('#engLinks');
+    box.innerHTML='<label>工程師簽收入口</label>'+ENGINEERS.map(e=>
+      `<a href="?user=${encodeURIComponent(e)}"><button class="btn btn-ghost" style="margin-bottom:8px;">👷 ${e} 的簽收清單</button></a>`
+    ).join('');
+  }).catch(()=>{});
+}
+
+
+/* ============================================================
+ * 二、管理員端
+ * ============================================================ */
+function renderAdmin(){
+  document.title='管理員 — 零用金建檔';
+  app.innerHTML=`
+  <header><h1>🔐 管理員後台</h1><div class="sub" id="adminWho">尚未登入</div></header>
+  <div class="wrap">
+    <div class="card" id="loginCard">
+      <h2>管理員登入</h2>
+      <p class="muted">請使用白名單內的 Google 帳號登入後操作。</p>
+      <div id="gbtn" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="adminPanel" class="hidden">
+      <!-- 建檔表單 -->
+      <div class="card">
+        <h2>📝 新增請款建檔</h2>
+        <label>① 上傳發票照片</label>
+        <input type="file" accept="image/*" id="invFile" />
+        <div class="preview" id="invPreview"><img id="invImg" /></div>
+        <button class="btn btn-ghost" id="ocrBtn" style="margin-top:10px;" disabled>🔍 自動辨識金額與日期</button>
+
+        <div class="row" style="margin-top:6px;">
+          <div><label>② 金額 (NT$)</label><input type="number" id="fAmount" placeholder="0" /></div>
+          <div><label>發票日期</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" /></div>
+        </div>
+
+        <label>③ 選擇工程師（師傅）</label>
+        <div class="eng-grid" id="engGrid"></div>
+
+        <div class="row" style="margin-top:6px;">
+          <div><label>④ 專案名稱</label><input type="text" id="fProject" placeholder="例：信義路門市裝修" /></div>
+          <div><label>類別</label><input type="text" id="fCategory" placeholder="例：材料費" /></div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="submitBtn" style="margin-top:16px;">✅ 送出建檔（狀態：待簽收）</button>
+      </div>
+
+      <!-- 總表 -->
+      <div class="card">
+        <h2>📊 零用金總表 <button class="btn btn-ghost" id="reloadBtn" style="width:auto;padding:6px 12px;font-size:13px;margin-left:auto;">重新整理</button></h2>
+        <div id="summary" class="muted"></div>
+        <div class="tbl-scroll"><table id="allTable"><tbody></tbody></table></div>
+      </div>
+    </div>
+  </div>`;
+
+  // 載入 Google Identity Services
+  loadScript('https://accounts.google.com/gsi/client',()=>{
+    if(GOOGLE_CLIENT_ID.indexOf('PUT_YOUR')===0){$('#gbtn').innerHTML='<p class="muted">尚未設定 GOOGLE_CLIENT_ID。</p>';return;}
+    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:onGoogleLogin});
+    google.accounts.id.renderButton($('#gbtn'),{theme:'filled_blue',size:'large',text:'signin_with',shape:'pill',locale:'zh_TW'});
+  });
+
+  bindAdminForm();
+}
+
+function onGoogleLogin(resp){
+  ADMIN_TOKEN = resp.credential;
+  const payload = JSON.parse(decodeURIComponent(escape(atob(ADMIN_TOKEN.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))));
+  $('#adminWho').textContent='已登入：'+payload.email;
+  $('#loginCard').classList.add('hidden');
+  $('#adminPanel').classList.remove('hidden');
+  // 載入工程師名單與總表
+  api({action:'getConfig'}).then(d=>{ENGINEERS=d.engineers||ENGINEERS;renderEngGrid();}).catch(()=>renderEngGrid());
+  loadAllTable();
+}
+
+let selectedEngineer='';
+let invoiceDataUrl='';
+
+function renderEngGrid(){
+  $('#engGrid').innerHTML=ENGINEERS.map(e=>`<button type="button" class="eng-btn" data-eng="${e}">${e}</button>`).join('');
+  $('#engGrid').querySelectorAll('.eng-btn').forEach(b=>{
+    b.onclick=()=>{selectedEngineer=b.dataset.eng;
+      $('#engGrid').querySelectorAll('.eng-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');};
+  });
+}
+
+function bindAdminForm(){
+  $('#invFile').addEventListener('change',async e=>{
+    const f=e.target.files[0]; if(!f)return;
+    toast('壓縮圖片中…');
+    invoiceDataUrl=await fileToCompressedDataURL(f);
+    $('#invImg').src=invoiceDataUrl;
+    $('#invPreview').style.display='block';
+    $('#ocrBtn').disabled=false;
+  });
+
+  $('#ocrBtn').addEventListener('click',async()=>{
+    if(!invoiceDataUrl)return;
+    const btn=$('#ocrBtn');const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 辨識中…';
+    try{
+      const d=await api({action:'ocr',idToken:ADMIN_TOKEN,imageBase64:invoiceDataUrl});
+      if(d.amount)$('#fAmount').value=d.amount;
+      if(d.date)$('#fDate').value=d.date;
+      toast('辨識完成，請確認金額與日期是否正確');
+    }catch(err){toast('辨識失敗：'+err.message,3500);}
+    finally{btn.disabled=false;btn.innerHTML=old;}
+  });
+
+  $('#submitBtn').addEventListener('click',async()=>{
+    const project=$('#fProject').value.trim();
+    const amount=$('#fAmount').value.trim();
+    if(!selectedEngineer)return toast('請選擇工程師');
+    if(!amount||Number(amount)<=0)return toast('請輸入正確金額');
+    if(!project)return toast('請輸入專案名稱');
+    const btn=$('#submitBtn');const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 送出中…';
+    try{
+      await api({action:'createRecord',idToken:ADMIN_TOKEN,
+        imageBase64:invoiceDataUrl,project,category:$('#fCategory').value.trim(),
+        engineer:selectedEngineer,amount,date:$('#fDate').value.trim()});
+      toast('建檔成功！已通知 '+selectedEngineer+' 簽收');
+      // 重置表單
+      $('#invFile').value='';invoiceDataUrl='';$('#invPreview').style.display='none';$('#ocrBtn').disabled=true;
+      $('#fAmount').value='';$('#fDate').value='';$('#fProject').value='';$('#fCategory').value='';
+      selectedEngineer='';$('#engGrid').querySelectorAll('.eng-btn').forEach(x=>x.classList.remove('active'));
+      loadAllTable();
+    }catch(err){toast('建檔失敗：'+err.message,3500);}
+    finally{btn.disabled=false;btn.innerHTML=old;}
+  });
+
+  $('#reloadBtn').addEventListener('click',loadAllTable);
+}
+
+async function loadAllTable(){
+  const tb=$('#allTable tbody');
+  tb.innerHTML='<tr><td colspan="9" class="center muted">載入中…</td></tr>';
+  try{
+    const d=await api({action:'listAll',idToken:ADMIN_TOKEN});
+    const rs=d.records||[];
+    let wait=0,done=0,diffCnt=0,total=0;
+    rs.forEach(r=>{r.status==='待簽收'?wait++:done++; if(r.diff&&r.diff!=='正常'&&r.diff!=='')diffCnt++; total+=Number(r.amount||0);});
+    $('#summary').innerHTML=`共 ${rs.length} 筆｜待簽收 <b>${wait}</b>｜已結清 <b>${done}</b>｜金額差異 <b style="color:var(--danger)">${diffCnt}</b>｜核發總額 NT$${total.toLocaleString()}`;
+    tb.innerHTML=`<tr><th>狀態</th><th>專案</th><th>工程師</th><th>核發</th><th>實收</th><th>差異</th><th>日期</th><th>發票</th><th>簽名</th></tr>`+
+      rs.map(r=>{
+        const isDiff=r.diff&&r.diff!=='正常'&&r.diff!=='';
+        const pill=r.status==='待簽收'?'<span class="pill pill-wait">待簽收</span>':'<span class="pill pill-done">已結清</span>';
+        return `<tr class="${isDiff?'diff':''}">
+          <td>${pill}</td><td>${esc(r.project)}<div class="muted">${esc(r.category||'')}</div></td>
+          <td>${esc(r.engineer)}</td><td>NT$${Number(r.amount||0).toLocaleString()}</td>
+          <td>${r.actualAmount!==''&&r.actualAmount!=null?'NT$'+Number(r.actualAmount).toLocaleString():'—'}</td>
+          <td>${isDiff?'<b style="color:var(--danger)">'+esc(r.diff)+'</b>':(r.status==='已結清'?'正常':'—')}</td>
+          <td>${esc(r.date||'')}</td>
+          <td>${r.photoUrl?`<a class="link" href="${r.photoUrl}" target="_blank">查看</a>`:'—'}</td>
+          <td>${r.signUrl?`<a class="link" href="${r.signUrl}" target="_blank">查看</a>`:'—'}</td>
+        </tr>`;
+      }).join('');
+  }catch(err){
+    if(/憑證|登入|過期/.test(err.message)){tb.innerHTML='<tr><td colspan="9" class="center danger">登入逾時，請重新整理頁面登入。</td></tr>';}
+    else tb.innerHTML='<tr><td colspan="9" class="center muted">載入失敗：'+esc(err.message)+'</td></tr>';
+  }
+}
+
+
+/* ============================================================
+ * 三、工程師端（免登入）
+ * ============================================================ */
+function renderEngineer(name){
+  document.title=name+' — 待簽收清單';
+  app.innerHTML=`
+  <header><h1>👷 ${esc(name)} 的簽收清單</h1><div class="sub">點選項目進行電子簽收，無需登入</div></header>
+  <div class="wrap"><div id="jobs"><div class="card center muted">載入中…</div></div></div>
+  <div id="modalHost"></div>`;
+  loadJobs(name);
+}
+
+async function loadJobs(name){
+  const box=$('#jobs');
+  try{
+    const d=await api({action:'listByUser',user:name});
+    const rs=d.records||[];
+    if(rs.length===0){box.innerHTML='<div class="card center"><h2 style="justify-content:center">🎉 目前沒有待簽收項目</h2><p class="muted">所有款項皆已完成簽收。</p></div>';return;}
+    box.innerHTML=rs.map(r=>`
+      <div class="job">
+        <div class="muted">${esc(r.project)}　${r.category?'｜'+esc(r.category):''}</div>
+        <div class="amt">NT$ ${Number(r.amount||0).toLocaleString()}</div>
+        <div class="meta">發票日期：${esc(r.date||'—')}　${r.photoUrl?`｜<a class="link" href="${r.photoUrl}" target="_blank">查看發票</a>`:''}</div>
+        <button class="btn btn-primary btn-lg" style="margin-top:12px;"
+          onclick='openSign(${JSON.stringify(r).replace(/'/g,"&#39;")}, ${JSON.stringify(name).replace(/'/g,"&#39;")})'>✍️ 進行簽收</button>
+      </div>`).join('');
+  }catch(err){box.innerHTML='<div class="card center muted">載入失敗：'+esc(err.message)+'</div>';}
+}
+
+let sigPad=null;
+function openSign(rec,name){
+  const issued=Number(rec.amount||0);
+  $('#modalHost').innerHTML=`
+  <div class="overlay" id="ov">
+    <div class="modal">
+      <div class="big-amount">核發金額<b>NT$ ${issued.toLocaleString()}</b></div>
+      <div class="muted center" style="margin:6px 0 18px;">${esc(rec.project)}</div>
+
+      <div id="step1">
+        <p class="center" style="font-weight:700;">請確認您實際收到的金額是否與上方相符？</p>
+        <div class="row" style="margin-top:14px;">
+          <button class="btn btn-ok btn-lg" id="amtOk">✔ 金額正確</button>
+          <button class="btn btn-danger btn-lg" id="amtNo">✘ 金額錯誤</button>
+        </div>
+      </div>
+
+      <div id="diffBox" class="hidden">
+        <label>請輸入您實際收到的金額 (NT$)</label>
+        <input type="number" id="actualInput" placeholder="實收金額" inputmode="numeric" />
+        <button class="btn btn-primary" id="diffNext" style="margin-top:10px;">下一步：簽名</button>
+      </div>
+
+      <div id="sigStep" class="hidden">
+        <label id="sigLabel">請在下方框內簽名</label>
+        <div class="sig-wrap"><canvas id="sigCanvas"></canvas></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-ghost" id="sigClear">🗑 清除重簽</button>
+          <button class="btn btn-ok btn-lg" id="sigSubmit">✅ 確認送出</button>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" id="closeModal" style="margin-top:14px;">取消</button>
+    </div>
+  </div>`;
+
+  let actualAmount=''; // 空字串代表與核發相同
+
+  $('#closeModal').onclick=()=>$('#modalHost').innerHTML='';
+  $('#amtOk').onclick=()=>{actualAmount='';goSign('金額正確，請簽名確認');};
+  $('#amtNo').onclick=()=>{$('#step1').classList.add('hidden');$('#diffBox').classList.remove('hidden');};
+  $('#diffNext').onclick=()=>{
+    const v=$('#actualInput').value.trim();
+    if(v===''||isNaN(Number(v)))return toast('請輸入正確的數字金額');
+    actualAmount=v;
+    $('#diffBox').classList.add('hidden');
+    goSign('實收 NT$'+Number(v).toLocaleString()+'，請簽名確認');
+  };
+
+  function goSign(labelText){
+    $('#sigStep').classList.remove('hidden');
+    $('#sigLabel').textContent=labelText;
+    initSignaturePad($('#sigCanvas'));
+  }
+  $('#sigClear').onclick=()=>sigPad&&sigPad.clear();
+
+  $('#sigSubmit').onclick=async()=>{
+    if(!sigPad||sigPad.isEmpty())return toast('請先簽名');
+    const btn=$('#sigSubmit');const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 送出中…';
+    try{
+      const d=await api({action:'sign',id:rec.id,user:name,
+        actualAmount:actualAmount,signatureBase64:sigPad.toDataURL()});
+      $('#modalHost').innerHTML='';
+      toast(d.diff!==0?('已送出（標記金額差異 NT$'+d.diff+'）'):'簽收完成，感謝您！',3500);
+      loadJobs(name);
+    }catch(err){toast('送出失敗：'+err.message,3500);btn.disabled=false;btn.innerHTML=old;}
+  };
+}
+
+/* ---------- HTML5 Canvas 簽名板（支援滑鼠 / 觸控） ---------- */
+function initSignaturePad(canvas){
+  const ratio=Math.max(window.devicePixelRatio||1,1);
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*ratio;canvas.height=rect.height*ratio;
+  const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);
+  ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';
+  let drawing=false,empty=true,last=null;
+  const pos=ev=>{const r=canvas.getBoundingClientRect();const t=ev.touches?ev.touches[0]:ev;
+    return{x:t.clientX-r.left,y:t.clientY-r.top};};
+  const start=ev=>{ev.preventDefault();drawing=true;empty=false;last=pos(ev);};
+  const move=ev=>{if(!drawing)return;ev.preventDefault();const p=pos(ev);
+    ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;};
+  const end=()=>{drawing=false;};
+  canvas.onmousedown=start;canvas.onmousemove=move;window.addEventListener('mouseup',end);
+  canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',end);
+  sigPad={isEmpty:()=>empty,clear:()=>{ctx.clearRect(0,0,canvas.width,canvas.height);empty=true;},
+    toDataURL:()=>canvas.toDataURL('image/png')};
+}
+
+/* ---------- 小工具 ---------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function loadScript(src,cb){const s=document.createElement('script');s.src=src;s.async=true;s.defer=true;s.onload=cb;document.head.appendChild(s);}
+</script>
+</body>
+</html>
