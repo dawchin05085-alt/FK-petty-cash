@@ -224,9 +224,17 @@ function renderAdmin(){
         <div class="stat-grid">
           <div class="stat"><div class="lbl">累計撥款</div><div class="val" id="statFund">—</div></div>
           <div class="stat"><div class="lbl">累計支出</div><div class="val" id="statSpent">—</div></div>
-          <div class="stat balance" id="statBalanceBox"><div class="lbl">目前結餘</div><div class="val" id="statBalance">—</div></div>
+          <div class="stat balance" id="statBalanceBox"><div class="lbl">目前結餘（還剩多少錢）</div><div class="val" id="statBalance">—</div></div>
         </div>
+        <div id="miniStats" class="muted" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:13px;"></div>
         <div id="lowWarn"></div>
+      </div>
+
+      <!-- 人員簽收連結 -->
+      <div class="card">
+        <h2>🔗 人員簽收連結</h2>
+        <p class="muted">複製對應連結用 LINE / 訊息傳給人員，他們點開即可簽收（免登入）。</p>
+        <div id="engLinksAdmin"></div>
       </div>
 
       <!-- 建檔表單 -->
@@ -295,9 +303,45 @@ function onGoogleLogin(resp){
   $('#loginCard').classList.add('hidden');
   $('#adminPanel').classList.remove('hidden');
   // 載入人員名單與總表
-  api({action:'getConfig'}).then(d=>{ENGINEERS=d.engineers||ENGINEERS;renderEngGrid();}).catch(()=>renderEngGrid());
+  api({action:'getConfig'}).then(d=>{ENGINEERS=d.engineers||ENGINEERS;renderEngGrid();renderEngLinksAdmin();})
+    .catch(()=>{renderEngGrid();renderEngLinksAdmin();});
   loadAllTable();
 }
+
+/** 人員專屬簽收網址（base = 目前網址去掉參數） */
+function engineerUrl(name){
+  return location.origin + location.pathname + '?user=' + encodeURIComponent(name);
+}
+
+function renderEngLinksAdmin(){
+  const box=$('#engLinksAdmin');
+  if(!box)return;
+  box.innerHTML=(ENGINEERS||[]).map(e=>{
+    const url=engineerUrl(e);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
+      <b style="min-width:72px;">${esc(e)}</b>
+      <input type="text" readonly value="${esc(url)}" onclick="this.select()"
+        style="flex:1;font-size:12px;padding:8px;color:var(--muted);" />
+      <button class="act act-edit" style="padding:8px 12px;" onclick='copyEngLink("${esc(e)}",this)'>複製</button>
+      <a class="act act-arch" style="padding:8px 12px;text-decoration:none;" href="${esc(url)}" target="_blank">開啟</a>
+    </div>`;
+  }).join('');
+}
+
+window.copyEngLink=async function(name,btn){
+  const url=engineerUrl(name);
+  try{
+    await navigator.clipboard.writeText(url);
+  }catch(e){
+    // 後備：用隱藏輸入框複製
+    const t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();
+    try{document.execCommand('copy');}catch(_){}
+    document.body.removeChild(t);
+  }
+  const old=btn.textContent;btn.textContent='已複製✓';
+  toast(name+' 的連結已複製');
+  setTimeout(()=>btn.textContent=old,1500);
+};
 
 let selectedEngineer='';
 let selectedCategory='';
@@ -440,6 +484,10 @@ async function loadAllTable(){
     $('#statSpent').textContent='NT$'+Number(s.totalSpent||0).toLocaleString();
     $('#statBalance').textContent='NT$'+Number(s.balance||0).toLocaleString();
     $('#statBalanceBox').classList.toggle('low',!!s.low);
+    $('#miniStats').innerHTML=
+      `<span>🕐 待簽收 <b>${s.waitCount||0}</b> 筆（在途 NT$${Number(s.pendingAmount||0).toLocaleString()}）</span>`+
+      `<span>✅ 已結清 <b>${s.doneCount||0}</b> 筆</span>`+
+      `<span>⚠️ 金額差異 <b style="color:var(--danger)">${s.diffCount||0}</b> 筆</span>`;
     $('#lowWarn').innerHTML = s.low
       ? `<div class="warn-box">⚠️ 結餘已低於 NT$${Number(s.threshold||0).toLocaleString()}，建議盡快向公司請款補錢。</div>` : '';
 
