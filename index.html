@@ -309,7 +309,8 @@ async function triggerOcr() {
     const d = await api({ action: 'ocr', idToken: ADMIN_TOKEN, imageBase64: invoiceDataUrl });
     if (d.amount) $('#fAmount').value = d.amount;
     if (d.date) $('#fDate').value = d.date;
-    toast('自動辨識完成，請確認金額與日期');
+    if (d.vendor && !$('#fProject').value.trim()) $('#fProject').value = d.vendor;
+    toast((d.engine === 'gemini' ? '🤖 AI 辨識完成' : '辨識完成') + '，請確認金額與日期');
     btn.innerHTML = '✨ 辨識完成（點擊可重新辨識）';
   } catch (err) {
     toast('自動辨識失敗：' + err.message, 3500);
