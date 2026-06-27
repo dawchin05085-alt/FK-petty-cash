@@ -251,6 +251,8 @@ function renderAdmin(){
           <div><label>② 金額 (NT$)</label><input type="number" id="fAmount" placeholder="0" /></div>
           <div><label>發票日期</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" /></div>
         </div>
+        <label>發票號碼（可自動辨識，亦可手動修改）</label>
+        <input type="text" id="fInvoiceNo" placeholder="例：AB-12345678" />
 
         <label>③ 選擇人員</label>
         <div class="eng-grid" id="engGrid"></div>
@@ -495,6 +497,7 @@ async function triggerOcr() {
     const d = await api({ action: 'ocr', idToken: ADMIN_TOKEN, imageBase64: invoiceDataUrl });
     if (d.amount) $('#fAmount').value = d.amount;
     if (d.date) $('#fDate').value = d.date;
+    if (d.invoiceNo) $('#fInvoiceNo').value = d.invoiceNo;
     if (d.vendor && !$('#fProject').value.trim()) $('#fProject').value = d.vendor;
     toast((d.engine === 'gemini' ? '🤖 AI 辨識完成' : '辨識完成') + '，請確認金額與日期');
     btn.innerHTML = '✨ 辨識完成（點擊可重新辨識）';
@@ -546,12 +549,13 @@ function bindAdminForm(){
     try{
       await api({action:'createRecord',idToken:ADMIN_TOKEN,
         imageBase64:invoiceDataUrl,project,category:selectedCategory,
-        engineer:selectedEngineer,amount,date:$('#fDate').value.trim()});
+        engineer:selectedEngineer,amount,date:$('#fDate').value.trim(),
+        invoiceNo:$('#fInvoiceNo').value.trim()});
       toast('建檔成功！已通知 '+selectedEngineer+' 簽收');
       // 重置表單
       $('#invFile').value='';invoiceDataUrl='';$('#invPreview').style.display='none';$('#ocrBtn').disabled=true;
       $('#ocrBtn').innerHTML='🔍 自動辨識金額與日期';
-      $('#fAmount').value='';$('#fDate').value='';$('#fProject').value='';
+      $('#fAmount').value='';$('#fDate').value='';$('#fProject').value='';$('#fInvoiceNo').value='';
       selectedEngineer='';$('#engGrid').querySelectorAll('.eng-btn').forEach(x=>x.classList.remove('active'));
       selectedCategory='';$('#catGrid').querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active'));
       loadAllTable();
@@ -625,7 +629,7 @@ function renderTable(){
       const canArch=(r.status==='已結清');
       const isArch=(r.status==='已封存');
       return `<tr class="${isDiff?'diff':''}">
-        <td>${pill}</td><td>${esc(r.project)}<div class="muted">${esc(r.category||'')}</div></td>
+        <td>${pill}</td><td>${esc(r.project)}<div class="muted">${esc(r.category||'')}${r.invoiceNo?' ｜ '+esc(r.invoiceNo):''}</div></td>
         <td>${esc(r.engineer)}</td><td>NT$${Number(r.amount||0).toLocaleString()}</td>
         <td>${r.actualAmount!==''&&r.actualAmount!=null?'NT$'+Number(r.actualAmount).toLocaleString():'—'}</td>
         <td>${isDiff?'<b style="color:var(--danger)">'+esc(r.diff)+'</b>':(r.status!=='待簽收'?'正常':'—')}</td>
@@ -716,6 +720,7 @@ window.openEditModal=function(id){
       <div><label>類別</label><input type="text" id="eCategory" value="${esc(r.category||'')}" /></div>
       <div><label>發票日期</label><input type="text" id="eDate" value="${esc(r.date||'')}" placeholder="YYYY-MM-DD" /></div>
     </div>
+    <label>發票號碼</label><input type="text" id="eInvoiceNo" value="${esc(r.invoiceNo||'')}" placeholder="例：AB-12345678" />
     <label>人員</label>
     <select id="eEngineer">${(ENGINEERS||[]).map(e=>`<option ${e===r.engineer?'selected':''}>${esc(e)}</option>`).join('')}
       ${ENGINEERS.indexOf(r.engineer)===-1&&r.engineer?`<option selected>${esc(r.engineer)}</option>`:''}</select>
@@ -730,7 +735,8 @@ window.openEditModal=function(id){
       await api({action:'updateRecord',idToken:ADMIN_TOKEN,id:id,
         amount:$('#eAmount').value.trim(),actualAmount:$('#eActual').value.trim(),
         project:$('#eProject').value.trim(),category:$('#eCategory').value.trim(),
-        date:$('#eDate').value.trim(),engineer:$('#eEngineer').value});
+        date:$('#eDate').value.trim(),engineer:$('#eEngineer').value,
+        invoiceNo:$('#eInvoiceNo').value.trim()});
       $('#adminModalHost').innerHTML='';
       toast('已更新');
       loadAllTable();
@@ -778,7 +784,7 @@ async function loadJobs(name){
       <div class="job">
         <div class="muted">${esc(r.project)}　${r.category?'｜'+esc(r.category):''}</div>
         <div class="amt">NT$ ${Number(r.amount||0).toLocaleString()}</div>
-        <div class="meta">發票日期：${esc(r.date||'—')}　${r.photoUrl?`｜<a class="link" href="${r.photoUrl}" target="_blank">查看發票</a>`:''}</div>
+        <div class="meta">發票日期：${esc(r.date||'—')}${r.invoiceNo?'　｜ 發票號碼：'+esc(r.invoiceNo):''}　${r.photoUrl?`｜<a class="link" href="${r.photoUrl}" target="_blank">查看發票</a>`:''}</div>
         <button class="btn btn-primary btn-lg" style="margin-top:12px;"
           onclick='openSign(${JSON.stringify(r).replace(/'/g,"&#39;")}, ${JSON.stringify(name).replace(/'/g,"&#39;")})'>✍️ 進行簽收</button>
       </div>`).join('');
