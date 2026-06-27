@@ -293,6 +293,18 @@ function renderAdmin(){
         </div>
         <div id="engLinksAdmin"></div>
       </div>
+
+      <!-- 管理員白名單 -->
+      <div class="card">
+        <h2>👥 管理員白名單</h2>
+        <p class="muted">在此清單內的 Google 帳號才能登入後台（建檔／總表／管理）。新增後永久保存。</p>
+        <div class="row" style="margin-bottom:12px;">
+          <input type="email" id="newAdminEmail" placeholder="輸入要授權的 Google Email" />
+          <button class="btn btn-ok" id="addAdminBtn" style="flex:0 0 auto;width:auto;padding:12px 18px;">＋ 新增管理員</button>
+        </div>
+        <div id="adminList"></div>
+        <p class="muted" style="margin-top:10px;font-size:12px;">⚠️ 新加的人若無法登入，多半是 Google「OAuth 同意畫面」仍在測試中，需把對方加為測試使用者，或將同意畫面發布為正式版。</p>
+      </div>
     </div>
   </div>
   <div id="adminModalHost"></div>`;
@@ -311,6 +323,7 @@ function renderAdmin(){
 function onGoogleLogin(resp){
   ADMIN_TOKEN = resp.credential;
   const payload = JSON.parse(decodeURIComponent(escape(atob(ADMIN_TOKEN.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))));
+  MY_EMAIL=(payload.email||'').toLowerCase();
   $('#adminWho').textContent='已登入：'+payload.email;
   $('#loginCard').classList.add('hidden');
   $('#adminPanel').classList.remove('hidden');
@@ -321,7 +334,43 @@ function onGoogleLogin(resp){
     renderEngGrid();renderEngLinksAdmin();renderCatGrid();
   }).catch(()=>{renderEngGrid();renderEngLinksAdmin();renderCatGrid();});
   loadAllTable();
+  loadAdmins();
 }
+
+let MY_EMAIL='';
+
+async function loadAdmins(){
+  const box=$('#adminList');
+  if(!box)return;
+  try{
+    const d=await api({action:'listAdmins',idToken:ADMIN_TOKEN});
+    const admins=d.admins||[];
+    box.innerHTML=admins.map(e=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
+        <span style="flex:1;font-size:14px;">${esc(e)}${e===MY_EMAIL?' <span class="muted">(你自己)</span>':''}</span>
+        ${e===MY_EMAIL?'':`<button class="act act-del" style="padding:8px 10px;" onclick='removeAdmin("${esc(e)}")'>移除</button>`}
+      </div>`).join('');
+  }catch(err){box.innerHTML='<p class="muted">載入白名單失敗：'+esc(err.message)+'</p>';}
+}
+
+function addAdminUI(){
+  const email=$('#newAdminEmail').value.trim().toLowerCase();
+  if(!email||email.indexOf('@')===-1)return toast('請輸入正確的 Email');
+  const btn=$('#addAdminBtn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  api({action:'addAdmin',idToken:ADMIN_TOKEN,email}).then(()=>{
+    $('#newAdminEmail').value='';
+    loadAdmins();
+    toast('已加入管理員：'+email);
+  }).catch(err=>toast('新增失敗：'+err.message,3500))
+    .finally(()=>{btn.disabled=false;btn.innerHTML='＋ 新增管理員';});
+}
+
+window.removeAdmin=function(email){
+  if(!confirm('確定將「'+email+'」移出管理員白名單？\n移除後該帳號將無法再登入後台。'))return;
+  api({action:'removeAdmin',idToken:ADMIN_TOKEN,email}).then(()=>{
+    loadAdmins();toast('已移除：'+email);
+  }).catch(err=>toast('移除失敗：'+err.message,3500));
+};
 
 /** 人員專屬簽收網址（base = 目前網址去掉參數） */
 function engineerUrl(name){
@@ -514,6 +563,8 @@ function bindAdminForm(){
   $('#addFundBtn').addEventListener('click',openFundModal);
   $('#addEngBtn').addEventListener('click',addEngineerUI);
   $('#newEngName').addEventListener('keydown',e=>{if(e.key==='Enter')addEngineerUI();});
+  $('#addAdminBtn').addEventListener('click',addAdminUI);
+  $('#newAdminEmail').addEventListener('keydown',e=>{if(e.key==='Enter')addAdminUI();});
   $('#filterChips').querySelectorAll('.fchip').forEach(c=>{
     c.onclick=()=>{
       currentFilter=c.dataset.f;
