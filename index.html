@@ -129,12 +129,19 @@
 
 <!-- ===================== 主程式 ===================== -->
 <script>
-/* ---------- 共用工具 ---------- */
+/* ---------- 全域變數與設定 ---------- */
 const $ = (s,el=document)=>el.querySelector(s);
 const params = new URLSearchParams(location.search);
 const app = $('#app');
+
 let ADMIN_TOKEN = '';          // Google ID Token
 let ENGINEERS = ['盧佳鈴', '余冠廷', '廖崇旭', '蔡道齊', '賴銘志', '蔡育倫'];
+let CATEGORIES = ['工程材料', '作業工具', '停車費', '油費', '飲食'];
+let selectedEngineer = '';
+let selectedCategory = '';
+let invoiceDataUrl = '';
+let currentFilter = '待簽收';
+let lastRecords = [];
 
 function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.add('show');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),ms);}
@@ -375,11 +382,6 @@ window.copyEngLink=async function(name,btn){
   setTimeout(()=>btn.textContent=old,1500);
 };
 
-let selectedEngineer='';
-let selectedCategory='';
-let invoiceDataUrl='';
-let CATEGORIES=['工程材料','作業工具','停車費','油費','飲食'];
-
 function renderEngGrid(){
   $('#engGrid').innerHTML=ENGINEERS.map(e=>`<button type="button" class="eng-btn" data-eng="${e}">${e}</button>`).join('');
   $('#engGrid').querySelectorAll('.eng-btn').forEach(b=>{
@@ -521,9 +523,6 @@ function bindAdminForm(){
     };
   });
 }
-
-let currentFilter='待簽收';
-let lastRecords=[];
 
 async function loadAllTable(){
   const tb=$('#allTable tbody');
