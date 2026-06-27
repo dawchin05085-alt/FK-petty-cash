@@ -230,13 +230,6 @@ function renderAdmin(){
         <div id="lowWarn"></div>
       </div>
 
-      <!-- 人員簽收連結 -->
-      <div class="card">
-        <h2>🔗 人員簽收連結</h2>
-        <p class="muted">複製對應連結用 LINE / 訊息傳給人員，他們點開即可簽收（免登入）。</p>
-        <div id="engLinksAdmin"></div>
-      </div>
-
       <!-- 建檔表單 -->
       <div class="card">
         <h2>📝 新增請款建檔</h2>
@@ -281,6 +274,17 @@ function renderAdmin(){
         <div id="summary" class="muted"></div>
         <div class="tbl-scroll"><table id="allTable"><tbody></tbody></table></div>
       </div>
+
+      <!-- 人員簽收連結 + 管理 -->
+      <div class="card">
+        <h2>🔗 人員簽收連結</h2>
+        <p class="muted">複製連結用 LINE / 訊息傳給人員，他們點開即可簽收（免登入）。新增的人員會永久保存，未來可直接使用。</p>
+        <div class="row" style="margin-bottom:12px;">
+          <input type="text" id="newEngName" placeholder="輸入新人員姓名" />
+          <button class="btn btn-ok" id="addEngBtn" style="flex:0 0 auto;width:auto;padding:12px 18px;">＋ 新增人員</button>
+        </div>
+        <div id="engLinksAdmin"></div>
+      </div>
     </div>
   </div>
   <div id="adminModalHost"></div>`;
@@ -316,7 +320,8 @@ function engineerUrl(name){
 function renderEngLinksAdmin(){
   const box=$('#engLinksAdmin');
   if(!box)return;
-  box.innerHTML=(ENGINEERS||[]).map(e=>{
+  if(!ENGINEERS||ENGINEERS.length===0){box.innerHTML='<p class="muted">尚無人員，請在上方新增。</p>';return;}
+  box.innerHTML=ENGINEERS.map(e=>{
     const url=engineerUrl(e);
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
       <b style="min-width:72px;">${esc(e)}</b>
@@ -324,9 +329,32 @@ function renderEngLinksAdmin(){
         style="flex:1;font-size:12px;padding:8px;color:var(--muted);" />
       <button class="act act-edit" style="padding:8px 12px;" onclick='copyEngLink("${esc(e)}",this)'>複製</button>
       <a class="act act-arch" style="padding:8px 12px;text-decoration:none;" href="${esc(url)}" target="_blank">開啟</a>
+      <button class="act act-del" style="padding:8px 10px;" onclick='removeEng("${esc(e)}")'>✕</button>
     </div>`;
   }).join('');
 }
+
+function addEngineerUI(){
+  const name=$('#newEngName').value.trim();
+  if(!name)return toast('請輸入姓名');
+  const btn=$('#addEngBtn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  api({action:'addEngineer',idToken:ADMIN_TOKEN,name}).then(d=>{
+    ENGINEERS=d.engineers||ENGINEERS;
+    $('#newEngName').value='';
+    renderEngGrid();renderEngLinksAdmin();
+    toast('已新增人員：'+name);
+  }).catch(err=>toast('新增失敗：'+err.message,3500))
+    .finally(()=>{btn.disabled=false;btn.innerHTML='＋ 新增人員';});
+}
+
+window.removeEng=function(name){
+  if(!confirm('確定移除人員「'+name+'」？\n（只是從選單與連結移除，已建檔的歷史紀錄不受影響）'))return;
+  api({action:'removeEngineer',idToken:ADMIN_TOKEN,name}).then(d=>{
+    ENGINEERS=d.engineers||ENGINEERS;
+    renderEngGrid();renderEngLinksAdmin();
+    toast('已移除：'+name);
+  }).catch(err=>toast('移除失敗：'+err.message,3500));
+};
 
 window.copyEngLink=async function(name,btn){
   const url=engineerUrl(name);
@@ -458,6 +486,8 @@ function bindAdminForm(){
 
   $('#reloadBtn').addEventListener('click',loadAllTable);
   $('#addFundBtn').addEventListener('click',openFundModal);
+  $('#addEngBtn').addEventListener('click',addEngineerUI);
+  $('#newEngName').addEventListener('keydown',e=>{if(e.key==='Enter')addEngineerUI();});
   $('#filterChips').querySelectorAll('.fchip').forEach(c=>{
     c.onclick=()=>{
       currentFilter=c.dataset.f;
