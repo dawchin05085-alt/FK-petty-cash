@@ -227,6 +227,7 @@ function renderAdmin(){
           <div class="stat balance" id="statBalanceBox"><div class="lbl">目前結餘（還剩多少錢）</div><div class="val" id="statBalance">—</div></div>
         </div>
         <div id="miniStats" class="muted" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:13px;"></div>
+        <div id="thresholdRow" class="muted" style="margin-top:10px;font-size:13px;"></div>
         <div id="lowWarn"></div>
       </div>
 
@@ -306,9 +307,12 @@ function onGoogleLogin(resp){
   $('#adminWho').textContent='已登入：'+payload.email;
   $('#loginCard').classList.add('hidden');
   $('#adminPanel').classList.remove('hidden');
-  // 載入人員名單與總表
-  api({action:'getConfig'}).then(d=>{ENGINEERS=d.engineers||ENGINEERS;renderEngGrid();renderEngLinksAdmin();})
-    .catch(()=>{renderEngGrid();renderEngLinksAdmin();});
+  // 載入人員/類別名單與總表
+  api({action:'getConfig'}).then(d=>{
+    ENGINEERS=d.engineers||ENGINEERS;
+    CATEGORIES=d.categories||CATEGORIES;
+    renderEngGrid();renderEngLinksAdmin();renderCatGrid();
+  }).catch(()=>{renderEngGrid();renderEngLinksAdmin();renderCatGrid();});
   loadAllTable();
 }
 
@@ -374,6 +378,7 @@ window.copyEngLink=async function(name,btn){
 let selectedEngineer='';
 let selectedCategory='';
 let invoiceDataUrl='';
+let CATEGORIES=['工程材料','作業工具','停車費','油費','飲食'];
 
 function renderEngGrid(){
   $('#engGrid').innerHTML=ENGINEERS.map(e=>`<button type="button" class="eng-btn" data-eng="${e}">${e}</button>`).join('');
@@ -385,13 +390,32 @@ function renderEngGrid(){
 }
 
 function renderCatGrid(){
-  const cats = ['工程材料', '作業工具', '停車費', '油費', '食物飲料', '其他'];
-  $('#catGrid').innerHTML=cats.map(c=>`<button type="button" class="cat-btn" data-cat="${c}">${c}</button>`).join('');
-  $('#catGrid').querySelectorAll('.cat-btn').forEach(b=>{
+  const grid=$('#catGrid');
+  // 一般類別 + 「其他」(直接點，不細分) + 「其他(新增類別)」(可新增永久類別)
+  const normal=CATEGORIES.map(c=>`<button type="button" class="cat-btn" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+  const special=
+    `<button type="button" class="cat-btn" data-cat="其他">其他</button>`+
+    `<button type="button" class="cat-btn" id="addCatBtn" style="border-style:dashed;color:var(--primary);">＋ 其他(新增類別)</button>`;
+  grid.innerHTML=normal+special;
+  // 綁定可選取的類別鈕（不含新增鈕）
+  grid.querySelectorAll('.cat-btn[data-cat]').forEach(b=>{
+    if(b.dataset.cat===selectedCategory)b.classList.add('active');
     b.onclick=()=>{selectedCategory=b.dataset.cat;
-      $('#catGrid').querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active'));
+      grid.querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active'));
       b.classList.add('active');};
   });
+  $('#addCatBtn').onclick=addCategoryUI;
+}
+
+function addCategoryUI(){
+  const name=prompt('輸入新類別名稱（之後會永久保存，可重複點選）');
+  if(!name||!name.trim())return;
+  api({action:'addCategory',idToken:ADMIN_TOKEN,name:name.trim()}).then(d=>{
+    CATEGORIES=d.categories||CATEGORIES;
+    selectedCategory=name.trim();
+    renderCatGrid();
+    toast('已新增類別：'+name.trim());
+  }).catch(err=>toast('新增失敗：'+err.message,3500));
 }
 
 async function handleImageFile(file) {
@@ -518,6 +542,7 @@ async function loadAllTable(){
       `<span>🕐 待簽收 <b>${s.waitCount||0}</b> 筆（在途 NT$${Number(s.pendingAmount||0).toLocaleString()}）</span>`+
       `<span>✅ 已結清 <b>${s.doneCount||0}</b> 筆</span>`+
       `<span>⚠️ 金額差異 <b style="color:var(--danger)">${s.diffCount||0}</b> 筆</span>`;
+    $('#thresholdRow').innerHTML=`⚙️ 結餘警示門檻：<b>NT$${Number(s.threshold||0).toLocaleString()}</b> <button class="act act-edit" style="margin-left:6px;" onclick="openThresholdModal(${Number(s.threshold||0)})">修改</button>`;
     $('#lowWarn').innerHTML = s.low
       ? `<div class="warn-box">⚠️ 結餘已低於 NT$${Number(s.threshold||0).toLocaleString()}，建議盡快向公司請款補錢。</div>` : '';
 
@@ -566,6 +591,32 @@ function renderTable(){
       </tr>`;
     }).join('');
 }
+
+/* ---------- 設定結餘警示門檻 ---------- */
+window.openThresholdModal=function(cur){
+  $('#adminModalHost').innerHTML=`
+  <div class="overlay"><div class="modal">
+    <h2>⚙️ 設定結餘警示門檻</h2>
+    <p class="muted">當「目前結餘」低於此金額時，系統會自動跳警示提醒補錢。</p>
+    <label>警示金額 (NT$)</label>
+    <input type="number" id="thrInput" inputmode="numeric" value="${Number(cur)||0}" />
+    <div class="row" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="$('#adminModalHost').innerHTML=''">取消</button>
+      <button class="btn btn-primary btn-lg" id="thrSubmit">儲存</button>
+    </div>
+  </div></div>`;
+  $('#thrSubmit').onclick=async()=>{
+    const v=$('#thrInput').value.trim();
+    if(v===''||isNaN(Number(v))||Number(v)<0)return toast('請輸入正確金額');
+    const btn=$('#thrSubmit');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 儲存中…';
+    try{
+      await api({action:'setThreshold',idToken:ADMIN_TOKEN,value:v});
+      $('#adminModalHost').innerHTML='';
+      toast('已更新警示門檻為 NT$'+Number(v).toLocaleString());
+      loadAllTable();
+    }catch(err){toast('設定失敗：'+err.message,3500);btn.disabled=false;btn.innerHTML='儲存';}
+  };
+};
 
 /* ---------- 撥款 / 補錢 ---------- */
 function openFundModal(){
